@@ -1,0 +1,2 @@
+# belote
+Belote card game

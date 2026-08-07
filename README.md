@@ -1,17 +1,22 @@
 # Belote (Белот)
 
-A desktop implementation of Bulgarian Belote in Java 17 + JavaFX, with a human
+A desktop implementation of Bulgarian Belote in Java 25 + JavaFX, with a human
 player (South) against three heuristic bots, fully localised in English and
 Bulgarian.
 
 ## Build and run
 
-Requires JDK 17 or newer and Maven.
+Requires **JDK 25** and Maven. The bytecode is class file version 69, so the jar
+will not start on an older JVM.
 
 ```bash
 mvn clean package
 java -jar target/belote.jar
 ```
+
+If you use sdkman, `.sdkmanrc` pins the project JDK — run `sdk env` in this
+directory (or `sdk env install` the first time) to switch to it without changing
+your global default.
 
 The build produces a single self-contained jar. JavaFX is bundled, defaulting to
 the **macOS Apple Silicon** natives. For another platform, override the
@@ -131,6 +136,8 @@ different deals, which exercises the whole rule set end to end.
 
 ## Verification status
 
-`mvn clean package` builds a runnable fat jar and all 62 tests pass. The jar
-launches without error. The JavaFX layout itself has **not** been visually
-reviewed — run it and judge the presentation yourself.
+`mvn clean package` on JDK 25 (Temurin 25.0.4) builds a runnable fat jar and all
+62 tests pass. The jar launches without error — the only console output is
+JavaFX's benign "classes were loaded from 'unnamed module'" notice, which is
+inherent to shading JavaFX into a non-modular jar. The JavaFX layout itself has
+**not** been visually reviewed — run it and judge the presentation yourself.

@@ -14,7 +14,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>25</maven.compiler.release>
     <javafx.version>25.0.4</javafx.version>
-    <junit.version>5.14.4</junit.version>
+    <junit.version>6.1.2</junit.version>
     <!-- Apple Silicon by default. Override with -Djavafx.platform=mac / win / linux. -->
     <javafx.platform>mac-aarch64</javafx.platform>
   </properties>

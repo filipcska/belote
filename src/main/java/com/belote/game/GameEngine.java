@@ -211,7 +211,7 @@ public final class GameEngine {
         if (currentTrick.isComplete()) {
             completeTrick();
         }
-        fire(l -> l.onStateChanged());
+        fire(Listener::onStateChanged);
     }
 
     /** Reveals a player's announcements as they play their first card of the hand. */

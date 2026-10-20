@@ -12,11 +12,12 @@ import java.util.List;
 /**
  * The single source of truth for which cards may legally be played.
  *
- * <p>Rule interpretation note: the specification states the mandatory-raise
- * (качване) rule only for All Trumps, and states the trump / over-trump
- * obligations for suit contracts only in the "cannot follow suit" branch.
- * This implementation follows that wording literally, so in a suit contract a
- * player who follows a trump lead may play any trump, high or low. See README.
+ * <p>Rules (belot.bg): follow suit; in a suit contract "качване в коз" is
+ * mandatory, so a player following a trump lead must beat the highest trump
+ * so far whenever able, whoever holds the trick, exactly as in All Trumps.
+ * A void player must ruff only when the opponents hold the trick, must
+ * over-ruff an opponent's ruff when able, and may otherwise play any card.
+ * No Trumps only requires following suit. See README.
  */
 public final class RuleValidator {
 
@@ -40,13 +41,14 @@ public final class RuleValidator {
         return legalMoves(hand, trick, contract).contains(card);
     }
 
-    /** The player holds the led suit and must play it; All Trumps may force a raise. */
+    /** The player holds the led suit and must play it; a trump lead may force a raise. */
     private static List<Card> followingSuit(List<Card> ofLedSuit, Trick trick,
                                             ContractType contract, Suit led) {
-        if (contract != ContractType.ALL_TRUMPS) {
+        if (!contract.isTrumpSuit(led)) {
             return ofLedSuit;
         }
-        // All Trumps: must overtake within the led suit when able, whoever is winning.
+        // Trump led (any suit in All Trumps, the trump suit otherwise): must overtake
+        // within the led suit when able, whoever is winning.
         int highest = TrickResolver.highestOfLedSuit(trick, contract);
         List<Card> higher = new ArrayList<>();
         for (Card c : ofLedSuit) {

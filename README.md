@@ -55,49 +55,84 @@ listeners and the UI re-renders in place; nothing needs restarting. Strings live
 in `src/main/resources/i18n/messages_en.properties` and `messages_bg.properties`
 (read as UTF-8, so the Cyrillic needs no escaping).
 
-## Rule interpretations
+## Rules
 
-The specification left a handful of cases open. Each decision below is
-implemented deliberately and covered by tests — they are the places most likely
-to differ from a given table's house rules.
+The rules follow the belot.bg rulebook ("Белот правила: раздаване, анонси и
+точкуване" and the accompanying articles on scoring, declarations and card
+strength). Each rule below is implemented explicitly and covered by tests.
+Where the sources leave a case open, the choice made is marked
+*interpretation*: these are the places most likely to differ from a given
+table's house rules.
 
-**Play constraints.** The spec states the mandatory-raise (качване) rule only for
-All Trumps, and states the trump / over-trump obligations for suit contracts only
-in the "cannot follow suit" branch. This is implemented literally: in a suit
-contract, a player following a *trump lead* may play any trump, high or low.
-Many real tables require over-trumping there too. If you want that behaviour,
-it is a small change in `RuleValidator.followingSuit`.
+**Play constraints** (`RuleValidator`).
+- Follow the led suit whenever you can.
+- When trump is led (in a suit contract, or any suit in All Trumps), you must
+  beat the highest card so far if you can, even when your partner is
+  winning (качване). This follows the rulebook's "задължителното отговаряне на
+  цвета и качването в коз" and its example of a partner being forced to take
+  a led trump 9 with the jack.
+- If you are void in the led suit in a suit contract and the opponents hold
+  the trick, you must ruff. If an opponent has already ruffed, you must
+  over-ruff when you can, and otherwise you may play any card. If your partner
+  holds the trick, you may play anything.
+- No Trumps only requires following suit.
 
-**Long sequences.** A run of six or more scores as a quinte (100), not as a
-quinte plus a tierce.
+**Sequences.** A run of six or more scores as a quinte (100), not as a quinte
+plus a tierce (*interpretation*: the rulebook stops at five).
 
 **Sequence priority.** The team holding the single best sequence scores *all* of
 its sequences and the opposing team scores none. If the two teams' best
 sequences are exactly equal in length and top card, every sequence on both sides
 is cancelled.
 
-**Carrés.** Ranked among themselves by the same winner-takes-all rule (J > 9 >
-A/K/Q/10), but they never invalidate sequences and sequences never invalidate
-them.
+**Carrés.** Ranked by trump value, J > 9 > A > 10 > K > Q, so four aces beat
+four kings although both are worth 100. The winning team scores all its
+carrés. Carrés and sequences never cancel each other.
 
-**Belote.** Awarded automatically when a player holds K+Q of a trump suit, rather
-than requiring an explicit declaration when the first of the two is played. This
-avoids a human player silently losing 20 points to a misclick.
+**One card, one combination.** A card shared by a carré and a sequence counts
+in only one of them. The engine makes the choice for the player and keeps the
+more valuable option; leftover cards can still form a shorter sequence
+(*interpretation*: the rulebook leaves the choice to the player).
+
+**Declaring.** Sequences and carrés are declared with the player's first card
+of the hand. No Trumps has no declarations and no belote; only last 10 and
+capot score there.
+
+**Belote.** K+Q of trump (of any suit in All Trumps) earns 20 when the first of
+the two is played and that card leads the trick, follows the led suit, or ruffs,
+over-ruffs or under-ruffs in a suit contract. So in All Trumps a K or Q
+discarded on another suit loses the belote. It is announced automatically at
+that moment, so a misclick cannot cost the 20 points.
 
 **Made / set / hanging** is decided on *raw* points before rounding, so an exact
 81–81 split in a suit contract genuinely hangs.
 
-**Rounding.** Totals ending in .5 round against the contracting team: declarers
-round half down, defenders round half up.
+**Rounding.** The two rounded scores always add up to the rounded grand total:
+16 for a suit contract, 26 for No Trumps (rounded after doubling), 26 for All
+Trumps, plus premiums. The team with the larger last digit rounds up. If both
+last digits are equal, the team with fewer points rounds up (the rulebook's
+"ending in 4" rule for All Trumps). In a dead heat the hanging points round up,
+which gives the rulebook's 106–106 → 10 plus 11 hanging, and 154–154 → 15 plus
+16 hanging. Applying the equal-digits rule to suit contracts too, e.g. 86–76 →
+8–8, is an *interpretation*.
 
 **Set contracts.** The defenders take the sum of both teams' rounded points, plus
 any hanging points; the declarers take zero.
 
+**Double and redouble.** The team with more points takes the whole hand ×2
+(×4 for a redouble), all premiums included and whoever declared; the other
+team takes nothing. If a doubled hand hangs, all of its multiplied points hang.
+
 **Hanging points** go to whichever team wins the following hand, and hang again
 if that hand also ties.
 
-**Capot** cannot end the game: if a team crosses 151 on a capot hand, play
-continues. A dead heat at or above 151 also continues.
+**End of game.** The game ends once a team reaches 151. If both teams pass it in
+the same hand, the higher score wins, and an exact tie plays on. A capot hand
+cannot end the game ("с капо не се излиза"): another hand is played, and a
+passed-out hand does not count as that hand.
+
+**Not modelled.** The two-player (открит) variant described in "Белот за двама"
+is a different game and is not implemented.
 
 ## Bot behaviour
 
@@ -126,10 +161,12 @@ margin on top.
 mvn test
 ```
 
-62 tests covering trick resolution and card values, legal-move validation for all
-three contract families, announcement detection and priority resolution, the
-bidding hierarchy and double/redouble legality, and scoring including the No
-Trumps multiplier, capot, rounding and the made/set/hanging outcomes.
+80 tests covering trick resolution and card values, legal-move validation for all
+three contract families (including the mandatory raise on a trump lead),
+announcement detection and priority resolution (including carré ranking,
+shared cards and belote timing), the bidding hierarchy and double/redouble
+legality, and scoring: the No Trumps multiplier, capot, total-preserving
+rounding, winner-takes-all doubles and the made/set/hanging outcomes.
 
 `GameEngineTest` additionally plays complete games bot-versus-bot across 25
 different deals, which exercises the whole rule set end to end.
@@ -137,7 +174,7 @@ different deals, which exercises the whole rule set end to end.
 ## Verification status
 
 `mvn clean package` on JDK 25 (Temurin 25.0.4) builds a runnable fat jar and all
-62 tests pass. The jar launches without error — the only console output is
+80 tests pass. The jar launches without error — the only console output is
 JavaFX's benign "classes were loaded from 'unnamed module'" notice, which is
 inherent to shading JavaFX into a non-modular jar. The JavaFX layout itself has
 **not** been visually reviewed — run it and judge the presentation yourself.

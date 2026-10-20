@@ -8,14 +8,20 @@ import java.util.List;
 /**
  * Turns the raw outcome of a hand into scoreboard points.
  *
- * <p>Rule interpretations, documented in the README:
+ * <p>Rules (belot.bg), with the interpretations documented in the README:
  * <ul>
  *   <li>Made / set / hanging is decided on <em>raw</em> points, before rounding,
  *       so an exact 81–81 split in a suit contract really does hang.</li>
- *   <li>A total ending in .5 rounds against the contracting team: the declarers
- *       round half down, the defenders round half up.</li>
+ *   <li>Rounding keeps the hand's total intact: the two rounded scores always add
+ *       up to the rounded grand total (16 in a suit, 26 in No Trumps after
+ *       doubling, 26 in All Trumps, plus premiums). The team with the larger
+ *       remainder rounds up; on equal remainders the team with fewer points rounds
+ *       up, and on a dead heat the declarers' hanging points round up
+ *       (106–106 in a suit gives 10 and 11 hanging; 154–154 in All Trumps, 15 and 16).</li>
  *   <li>On a set contract the defenders take the sum of both teams' rounded
  *       points; the declarers take zero.</li>
+ *   <li>Under a double or redouble the team with more points takes the whole
+ *       multiplied hand, whoever declared; a dead heat freezes all of it.</li>
  *   <li>Hanging points are awarded to whichever team wins the following hand,
  *       and hang again if that hand also ties.</li>
  * </ul>
@@ -65,40 +71,65 @@ public final class ScoreCalculator {
         else if (raw[declaring] < raw[defending]) outcome = HandResult.Outcome.SET;
         else outcome = HandResult.Outcome.HANGING;
 
-        int[] rounded = new int[2];
-        rounded[declaring] = roundHalfDown(raw[declaring]);
-        rounded[defending] = roundHalfUp(raw[defending]);
+        int[] rounded = round(raw, declaring);
 
         int multiplier = contract.multiplier();
         int[] awarded = new int[2];
         int hangingCreated = 0;
+        int handTotal = (rounded[0] + rounded[1]) * multiplier;
 
-        switch (outcome) {
-            case MADE:
-                awarded[declaring] = rounded[declaring] * multiplier + hangingCarried;
-                awarded[defending] = rounded[defending] * multiplier;
-                break;
-            case SET:
-                // Defenders sweep the whole hand, including any frozen points.
-                awarded[defending] = (rounded[declaring] + rounded[defending]) * multiplier
-                        + hangingCarried;
-                awarded[declaring] = 0;
-                break;
-            case HANGING:
-                awarded[defending] = rounded[defending] * multiplier;
-                awarded[declaring] = 0;
-                // The declarers' points freeze, and any previously frozen points stay frozen.
-                hangingCreated = rounded[declaring] * multiplier + hangingCarried;
-                break;
+        if (multiplier > 1) {
+            // Doubled or redoubled: winner takes all, whoever declared.
+            if (outcome == HandResult.Outcome.HANGING) {
+                hangingCreated = handTotal + hangingCarried;
+            } else {
+                int winner = outcome == HandResult.Outcome.MADE ? declaring : defending;
+                awarded[winner] = handTotal + hangingCarried;
+            }
+        } else {
+            switch (outcome) {
+                case MADE:
+                    awarded[declaring] = rounded[declaring] + hangingCarried;
+                    awarded[defending] = rounded[defending];
+                    break;
+                case SET:
+                    // Defenders sweep the whole hand, including any frozen points.
+                    awarded[defending] = handTotal + hangingCarried;
+                    break;
+                case HANGING:
+                    awarded[defending] = rounded[defending];
+                    // The declarers' points freeze, and any previously frozen points stay frozen.
+                    hangingCreated = rounded[declaring] + hangingCarried;
+                    break;
+            }
         }
 
         return new HandResult(outcome, declaring, raw, rounded, awarded,
                 hangingCarried, hangingCreated, capot, capotTeam, resolved, multiplier);
     }
 
-    /** Round to nearest ten, with exact halves going up. */
-    public static int roundHalfUp(int raw) { return (raw + 5) / 10; }
+    /**
+     * Divides both teams' raw points by ten so that the results add up to the
+     * rounded grand total. The grand total ends in 2 (suit), 0 (No Trumps) or
+     * 8 (All Trumps), so it rounds to 16, 26 and 26 before premiums.
+     */
+    public static int[] round(int[] raw, int declaringTeam) {
+        int target = (raw[0] + raw[1] + 5) / 10;
+        int[] out = {raw[0] / 10, raw[1] / 10};
+        int extra = target - out[0] - out[1];   // 0, 1 or 2 teams round up
 
-    /** Round to nearest ten, with exact halves going down. */
-    public static int roundHalfDown(int raw) { return (raw + 4) / 10; }
+        if (extra >= 2) {
+            out[0]++;
+            out[1]++;
+        } else if (extra == 1) {
+            int r0 = raw[0] % 10;
+            int r1 = raw[1] % 10;
+            int up;
+            if (r0 != r1) up = r0 > r1 ? 0 : 1;
+            else if (raw[0] != raw[1]) up = raw[0] < raw[1] ? 0 : 1;
+            else up = declaringTeam;
+            out[up]++;
+        }
+        return out;
+    }
 }

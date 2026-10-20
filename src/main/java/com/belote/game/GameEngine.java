@@ -202,9 +202,15 @@ public final class GameEngine {
         }
 
         declareFor(seat);
+        Announcement belote = AnnouncementDetector.beloteOnPlay(
+                seat, card, players.get(seat).hand(), currentTrick, contract.type());
+        if (belote != null) {
+            declared.add(belote);
+            fire(l -> l.onAnnouncement(belote));
+        }
 
         players.get(seat).remove(card);
-        tracker.recordPlay(seat, card, currentTrick);
+        tracker.recordPlay(seat, card, currentTrick, contract.type());
         currentTrick.add(seat, card);
         fire(l -> l.onCardPlayed(seat, card));
 

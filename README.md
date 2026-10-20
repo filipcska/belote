@@ -28,8 +28,12 @@ mvn clean package -Djavafx.platform=win        # Windows
 mvn clean package -Djavafx.platform=linux      # Linux
 ```
 
-Cards are drawn from shapes and text at runtime, so there are no image assets to
-ship or lose.
+Card faces are drawn from vector text and shapes (corner indices and pips), so they
+stay sharp at any size. Only the pictures on J, Q and K (`cards/art_<suit>_<rank>.png`)
+and the card back (`cards/back.png`) are images, taken from the GreyWyvern playing
+card set (public domain, with an optional BSD licence; see
+`src/main/resources/cards/LICENCE-greywyvern.txt`). If an image is missing, `CardView`
+falls back to a drawn placeholder, so the game still runs.
 
 ## Layout
 

@@ -198,3 +198,247 @@ different deals, which exercises the whole rule set end to end.
 JavaFX's benign "classes were loaded from 'unnamed module'" notice, which is
 inherent to shading JavaFX into a non-modular jar. The JavaFX layout itself has
 **not** been visually reviewed — run it and judge the presentation yourself.
+
+## Roadmap: learning features
+
+This is a plan only; none of it is built yet. The idea is to let the game teach
+someone Belote from scratch, as an **optional layer** over the normal game. With
+every learning option switched off, the game plays exactly as it does today.
+
+### Design principles
+
+- **The engine stays unchanged.** A new `com.belote.learn` package holds a
+  `Coach` that subscribes to `GameEngine.Listener` events and asks
+  `RuleValidator` and `BotPlayer` *why*, without adding tutorial logic to the
+  rules.
+- **Explanations come from the real logic.** Rule reasons come from
+  `RuleValidator` and play reasons from `BotPlayer`, so the coach can never
+  contradict how the game actually behaves.
+- **Bilingual from day one.** Every explanation is an i18n key in both
+  `messages_en.properties` and `messages_bg.properties`. English text gives the
+  Bulgarian term on first use (e.g. "forced raise (качване)") so learners can
+  follow a real table.
+- **Every feature is a toggle.** A "Learning" menu or settings panel holds the
+  switches for coach, hints, face-up hands and so on.
+
+### Phase 0 — Foundations
+
+- [ ] **Reasons from `RuleValidator`.** Add a `MoveCheck` (or similar) method
+  that returns, for any card in the hand, whether it is legal and, if not, why:
+  must follow suit, must beat the highest trump (forced raise), must trump,
+  must over-trump. Keep `legalMoves` as it is and build it on top of the new
+  method so the two can't drift apart. Unit-test each reason.
+- [ ] **Reasons from `BotPlayer`.** Have the card and bid choices return a
+  `Decision(card, reasonKey, args)` instead of a bare card. Tag each branch:
+  partner's signalled suit, drawing lead, cash a boss card, return partner's
+  suit, pull trumps, safe low lead, running-suit signal, partner keeps the
+  trick (play points), duck as declarer, cheapest winner, discard. The existing
+  `chooseCard` keeps returning just the card. Extend `BotPlayerTest` to assert
+  the reasons too.
+- [ ] **Bid reasons.** Expose the per-contract hand evaluation the bot already
+  computes (score vs `SUIT_THRESHOLD` / `ALL_TRUMPS_THRESHOLD` /
+  `NO_TRUMPS_THRESHOLD`) together with what drives it (J and 9 of a suit,
+  aces, length).
+- [ ] **Stacked deals.** Let `GameEngine` accept a predetermined deck, e.g. a
+  `DealSource` that defaults to the shuffled `Deck`, so lessons and tests can
+  set up exact hands, dealer and bidding.
+- [ ] **Learning settings.** Add the toggles and remember them between runs
+  (e.g. `java.util.prefs.Preferences`).
+
+### Phase 1 — Coach mode (during a normal game)
+
+- [ ] **Why can't I play this card?** Clicking or hovering a disabled card shows
+  the `RuleValidator` reason in a tooltip or status line, e.g. "You must follow
+  hearts" or "You must beat the 9♠ — forced raise (качване)".
+- [ ] **Hint button.** It asks the bot what it would play in South's seat and
+  highlights that card with its reason: "Lead the A♠: your partner called
+  spades, so they likely hold the J, and East may have to give up the 9."
+  Optionally count the hints used per hand.
+- [ ] **Bot plays explained.** A small caption or log line under each bot card
+  shows its `Decision` reason, e.g. "North dropped the J♥: every heart left is
+  theirs". Partner explanations matter most; opponents' can be a separate
+  toggle.
+- [ ] **Bidding hint.** During bidding, show the hand's strength per contract
+  and the call the bot would make, with its reason (e.g. "J and 9 of spades plus
+  an ace: a good spades call").
+- [ ] **Announcements explained.** When a terca, quarta, quinta, carré or belot
+  is declared, briefly say what it is, its value and why it scored or was
+  cancelled by a higher one.
+- [ ] **End-of-hand breakdown.** Expand `HandResult` into a readable summary: points
+  per trick, last-trick 10, announcements, the No Trumps multiplier, doubles,
+  and whether the contract was made, the declarers went inside (вътре), or the
+  points are hanging, with the reason.
+- [ ] **Trick review.** Let the player step back through the tricks of the
+  finished hand, with the reason shown on each card.
+
+### Phase 2 — Practice aids
+
+- [ ] **Cheat-sheet panel.** A toggleable side panel with the trump and plain
+  rankings and points, the announcement values, and a short rule summary that
+  highlights what applies to the current contract.
+- [ ] **Face-up mode.** Show all four hands face up in practice games.
+- [ ] **Undo.** Take back the last card in practice games (this needs the
+  engine to snapshot or replay its state; disable it in normal games).
+- [ ] **Card memory aid.** Optionally show the played cards per suit and which
+  remaining cards are boss (from `CardTracker`), as training wheels for
+  counting.
+- [ ] **Simplified games.** Practice options that limit the contract to No
+  Trumps only or All Trumps only, turn off announcements, or play single hands
+  instead of a full game.
+
+### Phase 3 — Guided lessons
+
+- [ ] **Lesson framework.** Each `Lesson` has bilingual intro text, a stacked
+  deal (Phase 0), which features are enabled, a goal ("win this trick", "take
+  the last 10", "make your contract"), a check on the result, and a short
+  debrief. Lessons are data files where possible, so adding one needs no code.
+- [ ] **Lesson menu** with progress (completed or locked) saved between runs.
+- [ ] **Lessons in order:**
+  1. The cards: ranks and points in a plain suit vs in trumps
+  2. Following suit and winning a trick
+  3. Trumps: trumping and over-trumping, and when you may discard
+  4. The forced raise (качване) on a trump lead
+  5. The contracts: suit, No Trumps, All Trumps
+  6. Bidding: what makes a hand worth a call, doubles and redoubles
+  7. Announcements: terca, quarta, quinta, carré, belot, and who scores them
+  8. Scoring: last trick, made / inside / hanging, capot, No Trumps doubling
+  9. Strategy I: count trumps and boss cards
+  10. Strategy II: partnership, with the drawing lead, returning partner's suit
+      and the running-suit signal
+- [ ] **Free-play bridge.** After the last lesson, offer a normal game with the
+  coach switched on.
+
+### Phase 4 — Quizzes
+
+- [ ] **Quiz mode** with generated questions answered from the engine itself:
+  - "Which card wins this trick?" (`TrickResolver`)
+  - "Is this card legal here?" (`RuleValidator`, explained by the Phase 0
+    reasons)
+  - "How many points is this trick worth?" (card values)
+  - "Which announcement does this hand have, and how much is it worth?"
+    (`AnnouncementDetector`)
+  - "What would you bid?" (compared with the bot's evaluation)
+- [ ] **Score and streak**, and a link to the matching lesson after a wrong
+  answer.
+
+### Suggested order
+
+Phase 0 → Phase 1 (the most value, since it reuses the existing logic) →
+Phase 2 → Phase 3 → Phase 4. Play-test the base game before starting.
+
+## Roadmap: LAN multiplayer
+
+This is a plan only; none of it is built yet. It is separate from the learning
+features above, and neither depends on the other. The goal is to let up to four
+people on the same local network play at one table, with bots filling any empty
+seats. Single-player games stay exactly as they are.
+
+### What stands in the way today
+
+- `Seat.isHuman()` hard-codes South as the only human, and `GameEngine`,
+  `BotPlayer.createBots()` and `BeloteApp` all depend on it.
+- The bots are driven by the UI: `BeloteApp` schedules a `PauseTransition` and
+  calls `chooseBid` / `chooseCard`. In a networked game the host must run them.
+- The UI reads the engine directly, including every player's hand. A remote
+  player must only ever receive what their seat may see.
+- The table is drawn from South's point of view, but each player should see
+  themselves at the bottom.
+
+### Design principles
+
+- **The host decides.** One instance hosts the game and runs the only
+  `GameEngine` plus the bots. Clients send requests ("bid 2♠", "play A♥"), the
+  host checks them with the engine and sends out the results. A client never
+  changes game state itself.
+- **Each player gets only their own view.** It holds their own hand, the card
+  counts of the other players, the current trick, bids, contract, scores and
+  their legal moves. Other players' cards are never sent, which also stops
+  anyone reading them from network traffic.
+- **Full view, every time.** The state is small, so the host sends the whole
+  view after every change. That is simpler and more robust than sending only
+  the differences; separate event messages exist only to drive the animations.
+- **Few new dependencies.** Plain JDK sockets; for JSON, either Jackson or
+  simple hand-written encoding. No Java serialization.
+
+### Phase 1 — Refactor (useful even without networking)
+
+- [ ] **Seat controllers.** Replace `Seat.isHuman()` with a per-seat
+  `SeatController`: `LocalHuman`, `Bot`, `Remote`. `GameEngine` takes the seat
+  setup instead of deriving it from `Seat`.
+- [ ] **Table loop out of the UI.** Move the bot scheduling from `BeloteApp`
+  into a `Table` (or `GameHost`) class that owns the engine, asks each
+  controller for its move in turn, and keeps the bot think time and the pause
+  after a trick. The UI only sends the local player's moves to it.
+- [ ] **Per-seat view model.** Add a `SeatView` record built from the engine
+  for a given seat, and render `BeloteApp` only from it, never from
+  `GameEngine` directly.
+- [ ] **Rotated table.** Draw the table relative to the viewer's seat, so they
+  are always at the bottom and their partner at the top.
+- [ ] **Check that single-player is unchanged.** One local human and three bots
+  through the new path, with every existing test still passing.
+
+### Phase 2 — Networking
+
+- [ ] **Messages.** One JSON message per line over TCP, with a protocol version.
+  - From client to host: `Hello(version, name, rejoinToken?)`, `TakeSeat`,
+    `Ready`, `Bid`, `PlayCard`, `Leave`.
+  - From host to client: `Welcome(rejoinToken)`, `Lobby(seats)`,
+    `View(SeatView)`, `Event(card played / trick won / hand over…)`,
+    `Error(reason key)`.
+- [ ] **Host server.** A server socket on a configurable port, one reader
+  thread per client, and all incoming requests queued onto a single engine
+  thread so the engine is never touched from two threads at once. Send each
+  view only to its own seat.
+- [ ] **Client.** Connects, sends the player's moves, and hands each incoming
+  `View` to the JavaFX UI thread via `Platform.runLater`.
+- [ ] **Sending only what a seat may see.** One function builds the outgoing
+  view for each seat; unit-test that it never contains another seat's cards.
+- [ ] **Error reasons reuse i18n keys**, so they show in each client's own
+  language (each player can pick EN or БГ for themselves).
+
+### Phase 3 — Lobby and joining
+
+- [ ] **Host / Join dialogs.** "Host game" (choose name and port) and "Join
+  game" (enter the host's IP and port). Show the host's own LAN address so it
+  can be read out to the others.
+- [ ] **Lobby screen.** Players pick seats and so teams. The host can move
+  players, fill empty seats with bots, and start the game when ready.
+- [ ] **Automatic discovery on the local network.** UDP broadcast or mDNS
+  (e.g. JmDNS), so open games appear in a list and nobody has to type an IP.
+- [ ] **Note the macOS firewall prompt** in the README: it appears the first
+  time someone hosts.
+
+### Phase 4 — Robustness
+
+- [ ] **Disconnects.** A bot takes over the seat right away, so the game keeps
+  going.
+- [ ] **Rejoining.** The `rejoinToken` lets a player reclaim their seat and get
+  the current view.
+- [ ] **Heartbeat and timeouts**, to notice dead connections.
+- [ ] **Version check** in `Hello`, refusing a client that runs a different
+  protocol version with a clear message.
+- [ ] **Host leaving** ends the game cleanly for everyone, with a message.
+- [ ] **Optional:** a short chat or quick reactions in the lobby and at the
+  table.
+
+### Phase 5 — Tests
+
+- [ ] **Headless clients over local sockets.** Fake clients that play legal
+  moves automatically, so complete networked games run in tests, building on
+  the existing bot-vs-bot `GameEngineTest`.
+- [ ] **Message round-trip tests**, encoding and decoding every message type.
+- [ ] **Disconnect and rejoin tests** in the middle of a hand.
+
+### Later, optionally — phones in a browser
+
+- [ ] The host also runs a small built-in HTTP/WebSocket server, so friends can
+  join from a phone browser with nothing to install. It uses the same messages
+  and the same per-seat views, but needs a separate HTML/JS front end, because
+  JavaFX doesn't run in a browser. Only worth doing after the desktop version
+  works.
+
+### Suggested order
+
+Phase 1 → 2 → 3 → 4, with Phase 5 tests written along the way. Phases 1–2 alone
+give a working LAN game; 3–4 make it pleasant to use. A playable version is
+roughly a few days of work.

@@ -139,17 +139,36 @@ is a different game and is not implemented.
 `CardTracker` records every card played and every revealed void. From that,
 `BotPlayer`:
 
+- when its **partner called the contract**, leads the top card of a suit with
+  exactly two unseen cards above it (in a suit contract, only the trump suit),
+  to pull an opponent's high card under the caller's presumed top card: partner
+  calls spades, the bot leads the ace, the next opponent covers with the nine
+  and the caller takes both with the jack
 - computes **boss cards** — cards no outstanding card can beat — and cashes them,
-  richest first
-- **returns the partner's suit** when it holds no boss card of its own
+  richest first, unless an opponent known to be void in the suit may ruff
+- **returns the partner's suit** when it holds no boss card of its own, unless
+  the suit has run dry or an opponent can ruff it
 - **avoids leading into a known void** in a suit contract, where an opponent
   could ruff
 - **pulls trumps** when it is on the declaring side of a suit contract with three
   or more
 - when the partner already holds the trick, piles points onto it if that is safe
-  (last to play, or the partner's card is boss) and otherwise plays low
-- when an opponent holds it, wins as cheaply as possible, and otherwise discards
-  the least valuable card while keeping the partner's suit intact
+  (last to play, or the partner's card is boss and the opponent behind cannot
+  ruff it) and otherwise plays low; either way it keeps back trumps and boss
+  cards that would win tricks of their own
+- when **every card in its hand would win its trick** and the partner holds
+  the trick safely, drops the top card of a suit the partner could still lead
+  (in All Trumps, the jack of hearts from J-9 of hearts plus the last two clubs):
+  it tells the partner to lead that suit, and banks the card's points even if
+  they cannot
+- when the **partner signals** that way (a bot or the human player dropping the
+  top remaining card of a suit on its partner's trick), leads that suit at its
+  next turn, before cashing its own winners, which would force the partner to
+  discard theirs
+- when an opponent holds it, wins as cheaply as possible; on the declaring side
+  it lets a trick worth under 10 go rather than spend a trump or boss card,
+  unless it is last to play. Otherwise it discards the least valuable card,
+  keeping trumps, boss cards and the partner's suit
 
 Bidding evaluates the five-card hand separately for each contract type and bids
 only above a per-contract threshold; doubling and redoubling need a further
@@ -161,12 +180,13 @@ margin on top.
 mvn test
 ```
 
-80 tests covering trick resolution and card values, legal-move validation for all
+93 tests covering trick resolution and card values, legal-move validation for all
 three contract families (including the mandatory raise on a trump lead),
 announcement detection and priority resolution (including carré ranking,
 shared cards and belote timing), the bidding hierarchy and double/redouble
 legality, and scoring: the No Trumps multiplier, capot, total-preserving
 rounding, winner-takes-all doubles and the made/set/hanging outcomes.
+`BotPlayerTest` checks the bot's lead and follow choices in set positions.
 
 `GameEngineTest` additionally plays complete games bot-versus-bot across 25
 different deals, which exercises the whole rule set end to end.
@@ -174,7 +194,7 @@ different deals, which exercises the whole rule set end to end.
 ## Verification status
 
 `mvn clean package` on JDK 25 (Temurin 25.0.4) builds a runnable fat jar and all
-80 tests pass. The jar launches without error — the only console output is
+93 tests pass. The jar launches without error — the only console output is
 JavaFX's benign "classes were loaded from 'unnamed module'" notice, which is
 inherent to shading JavaFX into a non-modular jar. The JavaFX layout itself has
 **not** been visually reviewed — run it and judge the presentation yourself.

@@ -210,7 +210,7 @@ public final class GameEngine {
         }
 
         players.get(seat).remove(card);
-        tracker.recordPlay(seat, card, currentTrick);
+        tracker.recordPlay(seat, card, currentTrick, contract.type());
         currentTrick.add(seat, card);
         fire(l -> l.onCardPlayed(seat, card));
 

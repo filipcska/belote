@@ -102,6 +102,61 @@ class RuleValidatorTest {
     }
 
     @Test
+    void mustRaiseOnATrumpLeadInASuitContract() {
+        Trick t = new Trick(Seat.SOUTH);
+        t.add(Seat.SOUTH, c(Suit.HEARTS, Rank.ACE));
+
+        List<Card> hand = List.of(
+                c(Suit.HEARTS, Rank.SEVEN),
+                c(Suit.HEARTS, Rank.NINE),    // beats the ace in trump order
+                c(Suit.SPADES, Rank.ACE));
+
+        List<Card> legal = RuleValidator.legalMoves(hand, t, ContractType.HEARTS);
+        assertEquals(List.of(c(Suit.HEARTS, Rank.NINE)), legal);
+    }
+
+    @Test
+    void mustRaiseOnATrumpLeadEvenOverThePartner() {
+        // South leads the trump nine and still holds the trick; North must take it with the jack.
+        Trick t = new Trick(Seat.SOUTH);
+        t.add(Seat.SOUTH, c(Suit.HEARTS, Rank.NINE));
+        t.add(Seat.EAST, c(Suit.HEARTS, Rank.SEVEN));
+
+        List<Card> hand = List.of(
+                c(Suit.HEARTS, Rank.EIGHT),
+                c(Suit.HEARTS, Rank.JACK));
+
+        List<Card> legal = RuleValidator.legalMoves(hand, t, ContractType.HEARTS);
+        assertEquals(List.of(c(Suit.HEARTS, Rank.JACK)), legal);
+    }
+
+    @Test
+    void anyTrumpOnATrumpLeadWhenNoneIsHigher() {
+        Trick t = new Trick(Seat.SOUTH);
+        t.add(Seat.SOUTH, c(Suit.HEARTS, Rank.JACK));
+
+        List<Card> hand = List.of(
+                c(Suit.HEARTS, Rank.SEVEN),
+                c(Suit.HEARTS, Rank.ACE),
+                c(Suit.SPADES, Rank.ACE));
+
+        List<Card> legal = RuleValidator.legalMoves(hand, t, ContractType.HEARTS);
+        assertEquals(List.of(c(Suit.HEARTS, Rank.SEVEN), c(Suit.HEARTS, Rank.ACE)), legal);
+    }
+
+    @Test
+    void noRaiseObligationWhenFollowingAPlainSuitInASuitContract() {
+        Trick t = new Trick(Seat.SOUTH);
+        t.add(Seat.SOUTH, c(Suit.CLUBS, Rank.TEN));
+
+        List<Card> hand = List.of(
+                c(Suit.CLUBS, Rank.SEVEN),
+                c(Suit.CLUBS, Rank.ACE));
+
+        assertEquals(2, RuleValidator.legalMoves(hand, t, ContractType.HEARTS).size());
+    }
+
+    @Test
     void allTrumpsForcesRaisingWithinTheLedSuit() {
         Trick t = new Trick(Seat.SOUTH);
         t.add(Seat.SOUTH, c(Suit.CLUBS, Rank.TEN));

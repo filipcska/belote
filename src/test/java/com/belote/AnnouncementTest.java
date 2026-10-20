@@ -7,6 +7,7 @@ import com.belote.model.ContractType;
 import com.belote.model.Rank;
 import com.belote.model.Seat;
 import com.belote.model.Suit;
+import com.belote.model.Trick;
 
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AnnouncementTest {
@@ -185,5 +187,95 @@ class AnnouncementTest {
 
         assertEquals(20, AnnouncementDetector.pointsFor(resolved, 0));
         assertEquals(100, AnnouncementDetector.pointsFor(resolved, 1));
+    }
+
+    @Test
+    void carresAreRankedByTrumpValue() {
+        // Both A and K carres are worth 100, but the aces outrank the kings.
+        List<Announcement> all = List.of(
+                Announcement.carre(Seat.SOUTH, Rank.KING),
+                Announcement.carre(Seat.EAST, Rank.ACE));
+
+        List<Announcement> resolved = AnnouncementDetector.resolve(all);
+
+        assertEquals(1, resolved.size());
+        assertEquals(Seat.EAST, resolved.get(0).seat());
+    }
+
+    @Test
+    void aCardSharedByACarreAndASequenceCountsOnlyOnce() {
+        // Four queens plus J-Q-K of hearts: the heart queen cannot serve both.
+        List<Card> h = hand(c(Suit.HEARTS, Rank.QUEEN), c(Suit.CLUBS, Rank.QUEEN),
+                            c(Suit.DIAMONDS, Rank.QUEEN), c(Suit.SPADES, Rank.QUEEN),
+                            c(Suit.HEARTS, Rank.JACK), c(Suit.HEARTS, Rank.KING),
+                            c(Suit.CLUBS, Rank.SEVEN), c(Suit.DIAMONDS, Rank.EIGHT));
+
+        List<Announcement> found = AnnouncementDetector.detect(Seat.SOUTH, h, ContractType.SPADES);
+
+        assertEquals(1, found.size(), "the carre (100) beats the tierce (20)");
+        assertEquals(Announcement.Type.CARRE, found.get(0).type());
+    }
+
+    @Test
+    void cardsLeftOverByACarreMayStillFormASequence() {
+        // Four kings plus 9-10-J-Q-K of hearts: the carre takes the heart king,
+        // which leaves 9-10-J-Q as a quarte.
+        List<Card> h = hand(c(Suit.HEARTS, Rank.KING), c(Suit.CLUBS, Rank.KING),
+                            c(Suit.DIAMONDS, Rank.KING), c(Suit.SPADES, Rank.KING),
+                            c(Suit.HEARTS, Rank.NINE), c(Suit.HEARTS, Rank.TEN),
+                            c(Suit.HEARTS, Rank.JACK), c(Suit.HEARTS, Rank.QUEEN));
+
+        List<Announcement> found = AnnouncementDetector.detect(Seat.SOUTH, h, ContractType.SPADES);
+
+        assertEquals(150, found.stream().mapToInt(Announcement::points).sum());
+    }
+
+    @Test
+    void beloteIsDeclaredWithTheFirstOfKingAndQueenWhenLeading() {
+        List<Card> h = hand(c(Suit.HEARTS, Rank.KING), c(Suit.HEARTS, Rank.QUEEN));
+        Announcement a = AnnouncementDetector.beloteOnPlay(Seat.SOUTH, c(Suit.HEARTS, Rank.QUEEN), h,
+                new Trick(Seat.SOUTH), ContractType.HEARTS);
+
+        assertEquals(Announcement.Type.BELOTE, a.type());
+    }
+
+    @Test
+    void theSecondCardOfTheBeloteEarnsNothingMore() {
+        List<Card> h = hand(c(Suit.HEARTS, Rank.KING));   // the queen is already gone
+        assertNull(AnnouncementDetector.beloteOnPlay(Seat.SOUTH, c(Suit.HEARTS, Rank.KING), h,
+                new Trick(Seat.SOUTH), ContractType.HEARTS));
+    }
+
+    @Test
+    void beloteCountsWhenRuffingInASuitContract() {
+        Trick t = new Trick(Seat.EAST);
+        t.add(Seat.EAST, c(Suit.CLUBS, Rank.ACE));
+        List<Card> h = hand(c(Suit.HEARTS, Rank.KING), c(Suit.HEARTS, Rank.QUEEN));
+
+        assertEquals(Announcement.Type.BELOTE, AnnouncementDetector.beloteOnPlay(
+                Seat.SOUTH, c(Suit.HEARTS, Rank.KING), h, t, ContractType.HEARTS).type());
+    }
+
+    @Test
+    void allTrumpsBeloteIsLostWhenTheKingOrQueenIsDiscardedOnAnotherSuit() {
+        Trick t = new Trick(Seat.EAST);
+        t.add(Seat.EAST, c(Suit.CLUBS, Rank.ACE));
+        List<Card> h = hand(c(Suit.HEARTS, Rank.KING), c(Suit.HEARTS, Rank.QUEEN));
+
+        assertNull(AnnouncementDetector.beloteOnPlay(
+                Seat.SOUTH, c(Suit.HEARTS, Rank.KING), h, t, ContractType.ALL_TRUMPS));
+
+        t = new Trick(Seat.EAST);
+        t.add(Seat.EAST, c(Suit.HEARTS, Rank.SEVEN));
+        assertEquals(Announcement.Type.BELOTE, AnnouncementDetector.beloteOnPlay(
+                Seat.SOUTH, c(Suit.HEARTS, Rank.KING), h, t, ContractType.ALL_TRUMPS).type(),
+                "following the led suit keeps it");
+    }
+
+    @Test
+    void noBeloteInNoTrumps() {
+        List<Card> h = hand(c(Suit.HEARTS, Rank.KING), c(Suit.HEARTS, Rank.QUEEN));
+        assertNull(AnnouncementDetector.beloteOnPlay(Seat.SOUTH, c(Suit.HEARTS, Rank.KING), h,
+                new Trick(Seat.SOUTH), ContractType.NO_TRUMPS));
     }
 }
